@@ -3,13 +3,24 @@
 
 """
 Example of authenticating with OIDC / User-Assigned Managed Identity Bearer Token
-Can be expanded to retrieve values from Key Vault or other sources
+Using a static token credential object for fabric-cicd compatibility.
 """
 # Kevin Chant has extended this!!!
 # START-EXAMPLE
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 import argparse
 import os
+
+# Helper class to turn your raw text token into a required credential object
+class StaticTokenCredential:
+    def __init__(self, token: str):
+        self.token = token
+
+    def get_token(self, *scopes, **kwargs):
+        # Returns the token matching the standard structure Azure SDKs expect
+        from collections import namedtuple
+        AccessToken = namedtuple('AccessToken', ['token', 'expires_on'])
+        return AccessToken(self.token, 0)
 
 parser = argparse.ArgumentParser(description='Process some variables.')
 parser.add_argument('--WorkspaceId', type=str)
@@ -29,13 +40,16 @@ fabric_token = os.environ.get("FABRIC_BEARER_TOKEN")
 if not fabric_token:
     raise ValueError("Error: The FABRIC_BEARER_TOKEN environment variable is empty or missing from the runner environment.")
 
-# Initialize the FabricWorkspace object with the required parameters and pass the token directly
+# Create the credential object wrapper from the raw string token
+credential = StaticTokenCredential(fabric_token)
+
+# Initialize the FabricWorkspace object with the required parameters
 target_workspace = FabricWorkspace(
     workspace_id=args.WorkspaceId,
     environment=args.Environment,
     repository_directory=args.RepositoryDirectory,
     item_type_in_scope=item_type_in_scope,
-    bearer_token=fabric_token   
+    token_credential=credential   # <-- CHANGED FROM bearer_token TO token_credential
 )
 
 # # # Publish all items defined in item_type_in_scope
