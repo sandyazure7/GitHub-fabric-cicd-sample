@@ -8,17 +8,17 @@ name: Deploy via fabric-cicd
 # In addition, the below repository variables need to be configured:
 # ItemsInScope - List of all items you want deployed. For this example, I opted for the below items in the below format:
 #    "Notebook,Environment,Report,SemanticModel"
-# ProdWorkspace - GUID value of the production workspace. 
+# DevWorkspace - GUID value of the dev workspace.
 # TestWorkspace - GUID value of the test workspace.
+# ProdWorkspace - GUID value of the production workspace. 
 
-# Sets the trigger to update when pull request is done to the main branch
+# Sets the trigger to manual run
 on:
   workflow_dispatch:
 
 # Specify ResourceUrl and items in scope
 env:
   resourceUrl: https://api.fabric.microsoft.com
-  # ItemsInScope: "Notebook,Environment,Report,SemanticModel,MirroredDatabase"
 
 # Required permissions for GitHub OIDC token generation
 permissions:
@@ -37,11 +37,13 @@ jobs:
         with:
           python-version: 3.11
 
+      # Install fabric-cicd library
       - name: Install fabric-cicd library
         run: |
             python -m pip install --upgrade pip
             pip install fabric-cicd
 
+      # Authenticate seamlessly using OIDC & User-Assigned Managed Identity
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -49,11 +51,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Fetch the access token using native Azure CLI on Ubuntu
       - name: Fetch Fabric Access Token
         run: |
           fabricToken=$(az account get-access-token --resource ${{ env.resourceUrl }} --query accessToken -o tsv)
           echo "FABRIC_BEARER_TOKEN=$fabricToken" >> $GITHUB_ENV
 
+      # Run script to deploy with fabric-cicd to Dev
       - name: Run script to deploy with fabric-cicd to Dev
         run: python auth_spn_secret_AzDo.py --WorkspaceId ${{vars.DevWorkspace}} --Environment "Dev" --RepositoryDirectory "./workspace" --ItemsInScope ${{vars.ItemsInScope}}
 
@@ -69,11 +73,13 @@ jobs:
         with:
           python-version: 3.11
 
+      # Install fabric-cicd library
       - name: Install fabric-cicd library
         run: |
             python -m pip install --upgrade pip
             pip install fabric-cicd
 
+      # Authenticate seamlessly using OIDC & User-Assigned Managed Identity
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -81,11 +87,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Fetch the access token using native Azure CLI on Ubuntu
       - name: Fetch Fabric Access Token
         run: |
           fabricToken=$(az account get-access-token --resource ${{ env.resourceUrl }} --query accessToken -o tsv)
           echo "FABRIC_BEARER_TOKEN=$fabricToken" >> $GITHUB_ENV
 
+      # Run script to deploy with fabric-cicd to Test
       - name: Run script to deploy with fabric-cicd to Test
         run: python auth_spn_secret_AzDo.py --WorkspaceId ${{vars.TestWorkspace}} --Environment "Test" --RepositoryDirectory "./workspace" --ItemsInScope ${{vars.ItemsInScope}}
           
@@ -101,11 +109,13 @@ jobs:
         with:
           python-version: 3.11
 
+      # Install fabric-cicd library
       - name: Install fabric-cicd library
         run: |
             python -m pip install --upgrade pip
             pip install fabric-cicd
 
+      # Authenticate seamlessly using OIDC & User-Assigned Managed Identity
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -113,93 +123,12 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Fetch the access token using native Azure CLI on Ubuntu
       - name: Fetch Fabric Access Token
         run: |
           fabricToken=$(az account get-access-token --resource ${{ env.resourceUrl }} --query accessToken -o tsv)
           echo "FABRIC_BEARER_TOKEN=$fabricToken" >> $GITHUB_ENV
 
+      # Run script to deploy with fabric-cicd to Prod
       - name: Run script to deploy with fabric-cicd to Prod
         run: python auth_spn_secret_AzDo.py --WorkspaceId ${{vars.ProdWorkspace}} --Environment "Prod" --RepositoryDirectory "./workspace" --ItemsInScope ${{vars.ItemsInScope}}
-
-
-  # Job to deploy to Test via fabric-cicd
-  'Deploy_to_Test':
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4.2.2
-
-      # Use specific version of Python
-      - name: Setup Python
-        uses: actions/setup-python@v5.5.0
-        with:
-          python-version: 3.11
-
-      # Install fabric-cicd library
-      - name: Install fabric-cicd library
-        run: |
-            python -m pip install --upgrade pip
-            pip install fabric-cicd
-
-      # Authenticate seamlessly using OIDC & User-Assigned Managed Identity
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # Fetch the access token using native Azure CLI on Ubuntu
-      - name: Fetch Fabric Access Token
-        run: |
-          fabricToken=$(az account get-access-token --resource ${{ env.resourceUrl }} --query accessToken -o tsv)
-          echo "FABRIC_BEARER_TOKEN=$fabricToken" >> $GITHUB_ENV
-
-       # Run script to deploy with fabric-cicd to Test
-      - name: Run script to deploy with fabric-cicd to Test
-        run: python auth_spn_secret_AzDo.py --WorkspaceId ${{vars.TestWorkspace}} --Environment "Test" --RepositoryDirectory "./workspace" --ItemsInScope  ${{vars.ItemsInScope}}
-          
-  # Job to deploy to Prod via fabric-cicd
-  'Deploy_to_Prod':
-    # Set the dependency for the Test deployment
-    needs: Deploy_to_Test
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4.2.2
-
-      # Use specific version of Python
-      - name: Setup Python
-        uses: actions/setup-python@v5.5.0
-        with:
-          python-version: 3.11
-
-      # Install fabric-cicd library
-      - name: Install fabric-cicd library
-        run: |
-            python -m pip install --upgrade pip
-            pip install fabric-cicd
-
-      # Authenticate seamlessly using OIDC & User-Assigned Managed Identity
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # Fetch the access token using native Azure CLI on Ubuntu
-      - name: Fetch Fabric Access Token
-        run: |
-          fabricToken=$(az account get-access-token --resource ${{ env.resourceUrl }} --query accessToken -o tsv)
-          echo "FABRIC_BEARER_TOKEN=$fabricToken" >> $GITHUB_ENV
-
-       # Run script to deploy with fabric-cicd to Prod
-      - name: Run script to deploy with fabric-cicd to Prod
-        run: python auth_spn_secret_AzDo.py --WorkspaceId ${{vars.ProdWorkspace}} --Environment "Prod" --RepositoryDirectory "./workspace" --ItemsInScope  ${{vars.ItemsInScope}}
