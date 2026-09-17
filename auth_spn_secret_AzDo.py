@@ -2,17 +2,14 @@
 # Licensed under the MIT License.
 
 """
-Example of authenticating with SPN + Secret
+Example of authenticating with OIDC / User-Assigned Managed Identity Bearer Token
 Can be expanded to retrieve values from Key Vault or other sources
 """
 # Kevin Chant has extended this!!!
 # START-EXAMPLE
-# import from fabric_cicd and azure.identity to pass-through service principal
-# from azure.identity import DefaultAzureCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 import argparse
-# import os
-
+import os
 
 parser = argparse.ArgumentParser(description='Process some variables.')
 parser.add_argument('--WorkspaceId', type=str)
@@ -23,19 +20,22 @@ args = parser.parse_args()
 
 # Convert item_type_in_scope into a list
 allitems = args.ItemsInScope
-item_type_in_scope=allitems.split(",")
+item_type_in_scope = allitems.split(",")
 print(item_type_in_scope)
 
+# Securely grab the token passed from the GitHub runner environment
+fabric_token = os.environ.get("FABRIC_BEARER_TOKEN")
 
-# Authenticate with DefaultAzureCredential authenticated by PowerShell
-# credential = DefaultAzureCredential()
+if not fabric_token:
+    raise ValueError("Error: The FABRIC_BEARER_TOKEN environment variable is empty or missing from the runner environment.")
 
-# Initialize the FabricWorkspace object with the required parameters
+# Initialize the FabricWorkspace object with the required parameters and pass the token directly
 target_workspace = FabricWorkspace(
-    workspace_id= args.WorkspaceId,
+    workspace_id=args.WorkspaceId,
     environment=args.Environment,
     repository_directory=args.RepositoryDirectory,
-    item_type_in_scope=item_type_in_scope,    
+    item_type_in_scope=item_type_in_scope,
+    bearer_token=fabric_token   
 )
 
 # # # Publish all items defined in item_type_in_scope
